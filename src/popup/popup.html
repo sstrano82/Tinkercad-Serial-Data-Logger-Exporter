@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tinkercad Serial Data Logger</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <div class="header-brand">
+        <div class="header-logo">IO</div>
+        <div>
+          <h1 class="header-title">Tinkercad Serial Logger</h1>
+          <p class="header-subtitle">Tool Didattico • by Salvatore Strano</p>
+        </div>
+      </div>
+      <span class="status-badge status-idle" id="badge-status">...</span>
+    </header>
+
+    <main class="popup-main">
+      <!-- Sezione quando si è su Tinkercad -->
+      <div id="section-tinkercad" style="display: none;">
+        <div class="card status-card">
+          <div class="status-info">
+            <span class="info-label">Stato Connessione:</span>
+            <span class="info-val" id="text-conn">Connessione in corso...</span>
+          </div>
+          <div class="status-info">
+            <span class="info-label">Righe Catturate:</span>
+            <span class="info-val highlight-val" id="text-lines">0</span>
+          </div>
+        </div>
+
+        <div class="button-grid">
+          <button class="btn btn-record" id="btn-toggle-rec">
+            <span>●</span> Avvia Registrazione
+          </button>
+          <button class="btn btn-show-widget" id="btn-show-widget">
+            <span>📌</span> Mostra Widget
+          </button>
+        </div>
+
+        <div class="export-actions">
+          <button class="btn btn-secondary" id="btn-popup-csv">
+            💾 Scarica CSV
+          </button>
+          <button class="btn btn-secondary" id="btn-popup-txt">
+            📄 Scarica TXT
+          </button>
+          <button class="btn btn-tertiary" id="btn-popup-clear">
+            🗑️ Svuota
+          </button>
+        </div>
+      </div>
+
+      <!-- Sezione quando NON si è su Tinkercad -->
+      <div id="section-no-tinkercad" style="display: none;">
+        <div class="card welcome-card">
+          <p class="welcome-text">
+            Per acquisire i dati del monitor seriale, apri un progetto su <b>Tinkercad Circuits</b>.
+          </p>
+          <a href="https://www.tinkercad.com/circuits" target="_blank" class="btn btn-primary btn-block">
+            🚀 Apri Tinkercad Circuits
+          </a>
+        </div>
+      </div>
+
+      <!-- Guida rapida ed esempi -->
+      <details class="guide-accordion">
+        <summary class="guide-summary">💡 Esempio Arduino per Excel/Scilab</summary>
+        <div class="guide-content">
+          <p class="guide-desc">Stampa i valori separati da virgola:</p>
+          <pre class="code-snippet"><code>void loop() {
+  int v1 = analogRead(A0);
+  float v2 = v1 * (5.0 / 1023.0);
+  Serial.print(millis());
+  Serial.print(",");
+  Serial.println(v2);
+  delay(100);
+}</code></pre>
+          <ul class="guide-tips">
+            <li><b>Excel IT:</b> Seleziona separatore <code>;</code> e conversione decimale.</li>
+            <li><b>Scilab:</b> Usa <code>csvRead("file.csv", ",")</code> per caricare la matrice!</li>
+          </ul>
+        </div>
+      </details>
+    </main>
+
+    <footer class="popup-footer">
+      <div><b>Tinkercad Serial Data Logger v1.0.0</b></div>
+      <div style="margin-top: 3px;">© 2026 <b>Salvatore Strano</b> • Tutti i diritti riservati</div>
+      <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">Tool didattico per scuole e privati</div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+
