@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tinkercad Serial Data Logger & Exporter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Salvatore Strano",
   "description": "Tool didattico di Salvatore Strano. Cattura la seriale Arduino da Tinkercad ed esporta in CSV/TXT per Excel, Scilab e MATLAB.",
   "permissions": [
@@ -39,4 +39,3 @@
     "128": "icons/icon128.png"
   }
 }
-

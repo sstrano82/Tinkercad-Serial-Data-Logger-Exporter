@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ============================================================================
  * Tinkercad Serial Data Logger - Popup Script
  * ============================================================================
@@ -16,8 +16,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnTxt = document.getElementById('btn-popup-txt');
   const btnClear = document.getElementById('btn-popup-clear');
 
+  // Imposta versione da manifest
+  const manifestData = chrome.runtime.getManifest ? chrome.runtime.getManifest() : null;
+  const versionEl = document.getElementById('app-version');
+  if (versionEl && manifestData && manifestData.version) {
+    versionEl.textContent =  + manifestData.version;
+  }
+
   let activeTabId = null;
   let isCurrentlyRecording = false;
+  let pollInterval = null; // I4: inizializzato qui per cleanup sicuro su unload
 
   // 1. Trova la scheda attiva
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -72,8 +80,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   queryStatus();
-  const pollInterval = setInterval(queryStatus, 1000);
-  window.addEventListener('unload', () => clearInterval(pollInterval));
+  pollInterval = setInterval(queryStatus, 1000);
+  window.addEventListener('pagehide', () => { if (pollInterval) clearInterval(pollInterval); });
 
   // 3. Gestori pulsanti
   btnToggleRec.addEventListener('click', () => {

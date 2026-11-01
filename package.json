@@ -1,0 +1,16 @@
+{
+  "devDependencies": {
+    "archiver": "^8.0.0",
+    "terser": "^5.51.2"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "release": "node release.js patch",
+    "release:minor": "node release.js minor",
+    "release:major": "node release.js major"
+  },
+  "name": "tinkercad-serial-data-logger-exporter",
+  "description": "Tool didattico per scuole e privati",
+  "author": "Salvatore Strano",
+  "version": "1.0.1"
+}

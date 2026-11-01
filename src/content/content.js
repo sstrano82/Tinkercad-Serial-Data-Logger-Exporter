@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ============================================================================
  * Tinkercad Serial Data Logger & Exporter
  * Tool didattico per scuole e privati per l'acquisizione dati da Tinkercad/Arduino
@@ -85,10 +85,18 @@
                                 document.querySelector('.code_panel__serial__text') ||
                                 document.querySelector('[class*="serial__text"]');
 
-    // 3. Bottone Clear
-    domSerialClear = document.querySelector('.js-code_panel__serial__clear') ||
-                     document.querySelector('.code_panel__serial__button[data-action="clear"]') ||
-                     Array.from(document.querySelectorAll('a, button')).find(el => (el.textContent || '').trim().toLowerCase() === 'clear');
+    // 3. Bottone Clear (I6: ricerca ottimizzata, non ripete se già trovato)
+    if (!domSerialClear || !document.contains(domSerialClear)) {
+      domSerialClear = document.querySelector('.js-code_panel__serial__clear') ||
+                       document.querySelector('.code_panel__serial__button[data-action="clear"]') ||
+                       null;
+      if (!domSerialClear) {
+        // Fallback testo: cerca solo nel pannello seriale
+        const serialRoot = document.querySelector('[class*="code_panel__serial"]') || document;
+        domSerialClear = Array.from(serialRoot.querySelectorAll('a, button'))
+          .find(el => (el.textContent || '').trim().toLowerCase() === 'clear') || null;
+      }
+    }
 
     // Se l'elemento di output è cambiato o appena apparso
     if (currentSerialOutput && currentSerialOutput !== domSerialOutput) {
@@ -132,9 +140,8 @@
 
   function onSimulationStopped() {
     console.log('[Tinkercad Serial Logger] Simulazione interrotta.');
-    if (state.isRecording && state.options.autoRecordOnSim) {
-      // Se era in auto-record, manteniamo la registrazione o la fermiamo
-      // Generalmente lasciamo che l'utente scelga se fermare o accumulare
+    if (state.isRecording) {
+      stopRecording();
     }
   }
 
@@ -198,8 +205,7 @@
       state.lastObservedLength = currentText.length;
       state.lastObservedText = currentText;
     } else if (currentText !== state.lastObservedText) {
-      // Lunghezza uguale ma testo modificato
-      chunk = currentText;
+      // Lunghezza uguale ma testo diverso: reset senza chunk (evita duplicati)
       state.lastObservedLength = currentText.length;
       state.lastObservedText = currentText;
     }
@@ -228,7 +234,13 @@
     }
   }
 
+  const MAX_CAPTURED_LINES = 50000;
+
   function addRecordedLine(rawLine) {
+    if (state.capturedLines.length >= MAX_CAPTURED_LINES) {
+      showTemporaryToast(`⚠️ Limite ${MAX_CAPTURED_LINES} righe raggiunto. Esporta e svuota i dati.`);
+      return;
+    }
     const now = performance.now();
     const elapsedSec = ((now - state.recordingStartTime) / 1000).toFixed(3);
     const timeStr = new Date().toLocaleTimeString();
@@ -280,7 +292,7 @@
     console.log('[Tinkercad Serial Logger] Registrazione avviata.');
   }
 
-  function stopRecording() {
+  async function stopRecording() {
     if (!state.isRecording) return;
 
     // Se c'era una riga residua nel buffer, salvala
@@ -293,7 +305,7 @@
 
     // Chiudi lo stream di file locale se attivo
     if (state.fileWritableStream) {
-      closeFileStream();
+      await closeFileStream(); // Attende chiusura sicura del file
     }
 
     updateUIRecordingState();
@@ -305,6 +317,10 @@
     state.streamBuffer = '';
     updateStatsCounter();
     clearPreview();
+    // Svuota anche il monitor seriale nativo di Tinkercad (se disponibile)
+    if (domSerialClear) {
+      domSerialClear.click();
+    }
     console.log('[Tinkercad Serial Logger] Buffer cancellato.');
   }
 
@@ -527,14 +543,19 @@
       showTemporaryToast('Copiato negli appunti! Pronto per Excel/Scilab.');
     } catch (err) {
       console.error('Errore copia negli appunti:', err);
-      // Fallback
-      const ta = document.createElement('textarea');
-      ta.value = content;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      showTemporaryToast('Copiato!');
+      // Fallback legacy (execCommand deprecato ma ancora funzionante su Chrome/Edge)
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        showTemporaryToast(ok ? 'Copiato negli appunti!' : '⚠️ Impossibile copiare. Usa Salva CSV.');
+      } catch (e2) {
+        showTemporaryToast('⚠️ Impossibile copiare negli appunti.');
+      }
     }
   }
 
@@ -673,6 +694,18 @@
       container.style.display = 'flex';
     };
 
+    // S2: Ripristina posizione widget salvata in precedenza
+    if (chrome && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(['tck_widget_pos'], (res) => {
+        if (res && res.tck_widget_pos) {
+          container.style.bottom = 'auto';
+          container.style.right = 'auto';
+          container.style.left = res.tck_widget_pos.left;
+          container.style.top = res.tck_widget_pos.top;
+        }
+      });
+    }
+
     document.body.appendChild(container);
     document.body.appendChild(pill);
 
@@ -752,12 +785,17 @@
 
     optDelim.addEventListener('change', saveOptions);
     optTimestamp.addEventListener('change', saveOptions);
-    optHeader.addEventListener('input', saveOptions);
+    // I3: debounce evita chiamate continue a chrome.storage ad ogni tasto
+    let _saveHeaderTimer;
+    optHeader.addEventListener('input', () => {
+      clearTimeout(_saveHeaderTimer);
+      _saveHeaderTimer = setTimeout(saveOptions, 500);
+    });
     optDecimal.addEventListener('change', saveOptions);
     optAutoSim.addEventListener('change', saveOptions);
 
     // Trascinamento (Draggable)
-    makeDraggable(container, document.getElementById('tck-drag-handle'));
+    makeDraggable(container, container);
   }
 
   function applyOptionsToUI() {
@@ -838,8 +876,8 @@
     if (pillCountEl) pillCountEl.textContent = state.capturedLines.length;
   }
 
-  // Timer di registrazione
-  setInterval(() => {
+  // Timer di registrazione (C1: riferimento salvato per cleanup su unload)
+  const _recTimerInterval = setInterval(() => {
     if (state.isRecording && state.recordingStartTime > 0) {
       const elapsedSec = Math.floor((performance.now() - state.recordingStartTime) / 1000);
       const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
@@ -905,9 +943,16 @@
     let initialLeft = 0;
     let initialTop = 0;
 
+    // M6: line endings CRLF uniformi
+    // Elementi interattivi: non avviare il drag se si clicca su di essi
+    const DRAG_EXCLUDE = 'button, input, select, textarea, a, label, [role="button"]';
+
+    handle.style.cursor = 'grab';
+
     handle.addEventListener('mousedown', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.closest(DRAG_EXCLUDE)) return;
       isDragging = true;
+      handle.style.cursor = 'grabbing';
       startX = e.clientX;
       startY = e.clientY;
 
@@ -931,15 +976,21 @@
       const dy = e.clientY - startY;
       let newLeft = Math.max(10, Math.min(window.innerWidth - container.offsetWidth - 10, initialLeft + dx));
       let newTop = Math.max(10, Math.min(window.innerHeight - container.offsetHeight - 10, initialTop + dy));
-
       container.style.left = `${newLeft}px`;
       container.style.top = `${newTop}px`;
     }
 
     function onMouseUp() {
       isDragging = false;
+      handle.style.cursor = 'grab';
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      // S2b: salva posizione per ripristinarla al prossimo caricamento
+      if (chrome && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({
+          tck_widget_pos: { left: container.style.left, top: container.style.top }
+        });
+      }
     }
   }
 
@@ -977,18 +1028,19 @@
           clearCapturedData();
           sendResponse({ success: true });
           break;
-        case 'SHOW_WIDGET':
-          const container = document.getElementById('tck-logger-container');
-          const pill = document.getElementById('tck-pill-btn');
-          if (container) {
-            container.style.display = 'flex';
-            container.classList.remove('tck-minimized');
+        case 'SHOW_WIDGET': {
+          const widgetContainer = document.getElementById('tck-logger-container');
+          const widgetPill = document.getElementById('tck-pill-btn');
+          if (widgetContainer) {
+            widgetContainer.style.display = 'flex';
+            widgetContainer.classList.remove('tck-minimized');
           }
-          if (pill) {
-            pill.style.display = 'none';
+          if (widgetPill) {
+            widgetPill.style.display = 'none';
           }
           sendResponse({ success: true });
           break;
+        }
         default:
           sendResponse({ error: 'Azione sconosciuta' });
       }
@@ -1002,7 +1054,15 @@
   createLoggerUI();
 
   // Scansione ciclica ogni 600ms per rilevare l'apertura/chiusura del pannello seriale
-  setInterval(findTinkercadElements, 600);
+  const _scanInterval = setInterval(findTinkercadElements, 600);
+
+  // C1: Pulizia risorse su unload — evita memory leak su navigazione interna
+  window.addEventListener('pagehide', () => {
+    clearInterval(_recTimerInterval);
+    clearInterval(_scanInterval);
+    if (serialObserver) serialObserver.disconnect();
+    if (state.fileWritableStream) closeFileStream();
+  });
 
   console.log('[Tinkercad Serial Logger] Widget caricato con successo.');
 })();
